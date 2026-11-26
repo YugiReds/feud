@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Are You Smarter Than a 5th Grader?</title>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+/* VOICE: loud, bright family game show
+   IDEA: a classroom chalkboard turned TV quiz set
+   PICTURE: the live question and four big coloured answer tiles
+   COLOUR and TYPE: chalkboard green field, chalk white, school-bus yellow; Kahoot-style red/blue/yellow/green tiles; Fredoka + Nunito
+   LAYOUT: top bar (grade + timer), question, 2x2 answers; phones get 4 giant buttons */
+:root{color-scheme:dark;--bg:#1f3a2c;--bg2:#2a4b39;--chalk:#f4f1e6;--mut:#c9d6c9;--bus:#ffc928;--r:#e5384f;--b:#2f6fde;--y:#e8a10a;--g:#1f9e57;--ok:#36d07a;--x:#ff4b4b}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(ellipse 120% 80% at 50% 0%,#2f5a44,var(--bg) 65%);color:var(--chalk);font:18px/1.45 Nunito,system-ui,sans-serif;overflow-x:hidden}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(115deg,rgba(255,255,255,.018) 0 2px,transparent 2px 9px);z-index:0}
+h1,h2,.big,.ans,.pin,.timer,.pts,.grade{font-family:Fredoka,Nunito,sans-serif;font-weight:700}
+.wrap{position:relative;z-index:1;max-width:1300px;margin:0 auto;padding:18px max(3vw,14px) 30px;min-height:100vh;display:flex;flex-direction:column}
+.hidden{display:none!important}
+button{font:900 18px Nunito,sans-serif;min-height:48px;padding:0 20px;border:0;border-radius:14px;background:var(--bus);color:#2a2100;cursor:pointer;box-shadow:0 4px 0 #b58c00}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 #b58c00}
+button:focus-visible{outline:3px solid #fff;outline-offset:2px}
+.ghost{background:transparent;color:var(--chalk);border:2px solid var(--mut);box-shadow:none}
+.top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.logo{font:700 clamp(22px,3vw,34px)/1.05 Fredoka,sans-serif;color:var(--bus);text-shadow:0 3px 0 rgba(0,0,0,.3)}
+.logo small{display:block;font:800 14px Nunito;color:var(--mut);text-shadow:none}
+.pill{background:rgba(0,0,0,.25);border-radius:999px;padding:8px 16px;font-weight:900;font-size:16px}
+/* lobby */
+.lobby{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;background:var(--chalk);color:#1f3a2c;border-radius:24px;padding:22px 28px;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+.lobby .lab{font-weight:900;color:#4b6b58}
+.url{font:900 clamp(20px,3vw,32px) Nunito;overflow-wrap:anywhere}
+.pin{font-size:clamp(64px,11vw,130px);line-height:1;letter-spacing:6px}
+.qr{width:clamp(150px,20vw,230px);aspect-ratio:1;background:#fff;border-radius:12px}.qr svg{width:100%;height:100%;display:block}
+.names{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:24px 0;min-height:60px}
+.chip{background:var(--bg2);border:2px solid var(--chalk);border-radius:999px;padding:8px 18px;font:700 22px Fredoka;animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(0)}}
+/* question */
+.grade{display:inline-block;background:var(--bus);color:#2a2100;border-radius:12px;padding:6px 16px;font-size:clamp(18px,2.2vw,24px)}
+.timer{font-size:clamp(48px,7vw,80px);line-height:1;width:1.8em;height:1.8em;border-radius:50%;display:grid;place-items:center;background:var(--chalk);color:#1f3a2c}
+.timer.low{background:var(--x);color:#fff;animation:beat .5s infinite}
+@keyframes beat{50%{transform:scale(1.08)}}
+.big{font-size:clamp(30px,4.6vw,60px);line-height:1.12;text-align:center;text-wrap:balance;margin:18px auto 22px;max-width:1100px}
+.bar{height:12px;background:rgba(0,0,0,.3);border-radius:999px;overflow:hidden;margin-bottom:18px}.bar i{display:block;height:100%;background:var(--bus);width:100%}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;flex:1}
+.ans{display:flex;align-items:center;gap:16px;border-radius:18px;padding:18px 22px;font-size:clamp(22px,3.2vw,40px);line-height:1.1;color:#fff;min-height:110px;box-shadow:inset 0 -8px 0 rgba(0,0,0,.2);position:relative;transition:opacity .3s,transform .3s}
+.ans svg{width:46px;height:46px;flex:none}
+.c0{background:var(--r)}.c1{background:var(--b)}.c2{background:var(--y)}.c3{background:var(--g)}
+.ans .cnt{margin-left:auto;font-size:.8em;opacity:.9}
+.ans.dim{opacity:.28;transform:scale(.97)}.ans.right{box-shadow:0 0 0 6px #fff,inset 0 -8px 0 rgba(0,0,0,.2);animation:pop .5s}
+.ans.right:after{content:"✓";position:absolute;right:18px;top:8px;font-size:1.2em}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+.first{background:var(--chalk);color:#1f3a2c;border-radius:18px;padding:14px 22px;text-align:center;font:700 clamp(22px,3vw,34px) Fredoka;animation:pop .5s}
+/* board */
+.lb{max-width:900px;width:100%;margin:10px auto;display:grid;gap:10px}
+.lrow{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:14px;align-items:center;background:var(--chalk);color:#1f3a2c;border-radius:16px;padding:12px 18px;font:700 clamp(20px,2.6vw,30px) Fredoka;animation:slide .5s both}
+.lrow:nth-child(1){background:var(--bus)}.lrow .rk{font-size:1.1em}
+@keyframes slide{from{transform:translateX(-40px);opacity:0}}
+.pod{display:flex;justify-content:center;align-items:flex-end;gap:14px;margin:30px auto;max-width:800px;width:100%}
+.pod div{flex:1;background:var(--chalk);color:#1f3a2c;border-radius:16px 16px 0 0;text-align:center;padding:14px 8px;font:700 clamp(18px,2.4vw,28px) Fredoka;animation:rise .8s both}
+@keyframes rise{from{transform:scaleY(0);transform-origin:bottom}}
+.pod .p1{height:300px;background:var(--bus)}.pod .p2{height:220px;animation-delay:.3s}.pod .p3{height:160px;animation-delay:.6s}
+.center{text-align:center}
+/* phone */
+.phone{max-width:520px;margin:0 auto;width:100%;flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;text-align:center}
+.card{background:var(--chalk);color:#1f3a2c;border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:10px}
+.card input{border:3px solid #1f3a2c;border-radius:14px;font:900 26px Nunito;text-align:center;padding:12px;min-height:60px;background:#fff;color:#1f3a2c}
+.card label{font-weight:900;text-align:left}
+.pbtns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;flex:1;min-height:56vh}
+.pbtn{border-radius:20px;color:#fff;font:700 clamp(18px,5vw,26px)/1.15 Fredoka;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px;box-shadow:inset 0 -8px 0 rgba(0,0,0,.2)}
+.pbtn svg{width:42px;height:42px}
+.pq{font:700 19px/1.3 Fredoka;color:var(--chalk)}
+.res{font:700 clamp(60px,20vw,120px)/1 Fredoka}
+.err{color:var(--x);font-weight:900;min-height:24px}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:9;width:100%;height:100%}
+@media(max-width:700px){.lobby{grid-template-columns:minmax(0,1fr)}.qr{margin:0 auto}.grid{grid-template-columns:minmax(0,1fr)}.ans{min-height:70px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+
+<!-- HOST -->
+<div class="wrap" id="host">
+  <div class="top">
+    <div class="logo">Are You Smarter Than a 5th Grader?<small>Answer on your phone. Fastest right answer scores the most!</small></div>
+    <span class="pill" id="conn">Connecting…</span>
+  </div>
+
+  <section id="hLobby">
+    <div class="lobby">
+      <div><div class="lab">On your phone, go to</div><div class="url" id="url"></div><div class="lab" style="margin-top:10px">Game PIN</div><div class="pin" id="pin"></div></div>
+      <div class="qr" id="qr"></div>
+    </div>
+    <div class="center" style="margin-top:18px;font-weight:900;color:var(--mut)" id="pcount">Waiting for players…</div>
+    <div class="names" id="names"></div>
+    <div class="center"><button id="start" style="font-size:24px;min-height:64px;padding:0 40px">Start the game</button> <button class="ghost" id="copy">Copy invite text</button></div>
+    <p class="center" id="copied" style="color:var(--mut);min-height:24px"></p>
+  </section>
+
+  <section id="hQ" class="hidden" style="display:flex;flex-direction:column;flex:1">
+    <div class="top"><span class="grade" id="qg"></span><span class="pill" id="qn"></span><div class="timer" id="tm">20</div></div>
+    <div class="bar"><i id="tbar"></i></div>
+    <div class="big" id="qt"></div>
+    <div class="grid" id="qa"></div>
+    <div class="foot"><span class="pill" id="answered">0 answered</span><div id="firstbox"></div><div><button class="ghost" id="skip">End timer</button> <button id="next" class="hidden">Next ▸</button></div></div>
+  </section>
+
+  <section id="hBoard" class="hidden">
+    <h2 class="center" style="font-size:44px;margin:6px 0 14px;color:var(--bus)" id="btitle">Leaderboard</h2>
+    <div class="lb" id="lb"></div>
+    <div class="center" style="margin-top:18px"><button id="next2" style="font-size:22px;min-height:60px">Next question ▸</button></div>
+  </section>
+
+  <section id="hEnd" class="hidden">
+    <h2 class="center" style="font-size:clamp(36px,6vw,64px);margin:10px 0;color:var(--bus)">Smarter than a 5th grader?</h2>
+    <div class="pod" id="pod"></div>
+    <div class="lb" id="lbEnd"></div>
+    <div class="center" style="margin-top:18px"><button id="again">Play again</button></div>
+  </section>
+</div>
+
+<!-- PLAYER -->
+<div class="wrap hidden" id="player">
+  <div class="logo center" style="margin-bottom:10px">Smarter Than a 5th Grader?</div>
+  <div class="phone">
+    <div id="pJoin" class="card">
+      <label for="ppin">Game PIN</label><input id="ppin" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="off">
+      <label for="pname">Your name</label><input id="pname" maxlength="20" placeholder="Name" autocomplete="nickname">
+      <button id="pgo" style="min-height:60px;font-size:22px">Join</button>
+      <div class="err" id="perr"></div>
+    </div>
+    <div id="pWait" class="hidden"><div class="res" style="font-size:64px">✏️</div><h2 id="pwName" style="font:700 34px Fredoka;margin:6px 0"></h2><p class="pq" id="pwMsg">You're in! Watch the TV.</p><p class="pq" id="pwScore" style="color:var(--bus)"></p></div>
+    <div id="pQ" class="hidden" style="display:flex;flex-direction:column;gap:12px;flex:1"><div class="pq" id="pqt"></div><div class="pbtns" id="pbtns"></div></div>
+    <div id="pRes" class="hidden"><div class="res" id="prIcon"></div><h2 id="prTitle" style="font:700 36px Fredoka;margin:6px 0"></h2><p class="pq" id="prSub"></p></div>
+  </div>
+</div>
+
+<canvas id="confetti"></canvas>
+
+<script>
+{
+/* ---------- questions (correct answer is always listed first; it gets shuffled) ---------- */
+const Q=[
+ ["1st Grade Math","What is 7 × 8?",["56","54","64","58"]],
+ ["1st Grade Spelling","Which word is spelled correctly?",["Necessary","Neccessary","Necesary","Neccesary"]],
+ ["1st Grade Science","Which planet is closest to the Sun?",["Mercury","Venus","Mars","Earth"]],
+ ["1st Grade Grammar","What is the plural of “goose”?",["Geese","Gooses","Goosen","Geeses"]],
+ ["1st Grade Geography","How many continents are there?",["7","6","5","8"]],
+ ["2nd Grade Math","How many sides does a hexagon have?",["6","5","7","8"]],
+ ["2nd Grade Science","Animals that eat only plants are called…",["Herbivores","Carnivores","Omnivores","Insectivores"]],
+ ["2nd Grade Grammar","Which of these is an adverb?",["Quickly","Quick","Quickness","Quicken"]],
+ ["2nd Grade History","The Great Pyramid of Giza was built for which pharaoh?",["Khufu","Tutankhamun","Ramses II","Cleopatra"]],
+ ["2nd Grade Math","What is 25% of 80?",["20","15","25","40"]],
+ ["3rd Grade Science","What gas do plants take in from the air?",["Carbon dioxide","Oxygen","Nitrogen","Hydrogen"]],
+ ["3rd Grade Math","How many minutes are in 3½ hours?",["210","180","200","350"]],
+ ["3rd Grade Geography","What is the capital of Australia?",["Canberra","Sydney","Melbourne","Perth"]],
+ ["3rd Grade Grammar","Which word is a proper noun?",["Cairo","City","River","Country"]],
+ ["3rd Grade Science","What is the largest organ of the human body?",["Skin","Liver","Heart","Brain"]],
+ ["4th Grade Math","What is the perimeter of a square with sides of 7?",["28","14","49","21"]],
+ ["4th Grade Science","At sea level, water boils at what temperature in °F?",["212°F","100°F","180°F","232°F"]],
+ ["4th Grade History","How many original American colonies were there?",["13","10","15","50"]],
+ ["4th Grade Geography","What is the smallest U.S. state?",["Rhode Island","Delaware","Connecticut","Hawaii"]],
+ ["4th Grade Science","How many bones are in the adult human body?",["206","106","306","250"]],
+ ["5th Grade Math","What is the Roman numeral XL?",["40","60","90","400"]],
+ ["5th Grade Science","Which part of a cell holds its DNA?",["Nucleus","Membrane","Cytoplasm","Ribosome"]],
+ ["5th Grade Geography","Which continent has the most countries?",["Africa","Asia","Europe","South America"]],
+ ["5th Grade Math","What is ¾ written as a decimal?",["0.75","0.34","0.43","0.7"]],
+ ["5th Grade Math","What is the next prime number after 7?",["11","9","13","8"]],
+ ["FINAL · 5th Grade Math · DOUBLE POINTS","How many seconds are in one day?",["86,400","36,000","3,600","24,000"]]
+];
+const DUR=20000,FINAL_DUR=25000;
+
+/* ---------- shared ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clip=(v,n)=>typeof v==="string"?v.replace(/[\u0000-\u001f]/g,"").trim().slice(0,n):"";
+const SH=['<svg viewBox="0 0 40 40"><path d="M20 4L37 34H3z" fill="#fff"/></svg>','<svg viewBox="0 0 40 40"><path d="M20 2L38 20L20 38L2 20z" fill="#fff"/></svg>','<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="#fff"/></svg>','<svg viewBox="0 0 40 40"><rect x="4" y="4" width="32" height="32" rx="3" fill="#fff"/></svg>'];
+const red=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const BROKERS=["wss://broker.emqx.io:8084/mqtt","wss://broker.hivemq.com:8884/mqtt"];
+let mq=null;
+function connect(subs,onMsg,onState){let bi=0,tries=0;
+  function go(){if(!window.mqtt){onState(false);setTimeout(go,1500);return}
+    const c=mqtt.connect(BROKERS[bi],{clientId:"s5_"+Math.random().toString(16).slice(2,12),clean:true,connectTimeout:7000,reconnectPeriod:3000,keepalive:30});let ok=false;
+    c.on("connect",()=>{ok=true;mq=c;subs().forEach(s=>c.subscribe(s));onState(true)});
+    c.on("message",(t,m)=>{let d;try{d=JSON.parse(m.toString())}catch(e){return}if(d&&typeof d==="object")onMsg(t,d)});
+    c.on("close",()=>onState(false));
+    setTimeout(()=>{if(!ok&&++tries<6){try{c.end(true)}catch(e){}bi=(bi+1)%BROKERS.length;go()}},8000)}
+  go()}
+const pub=(t,d,retain)=>{if(mq&&mq.connected)mq.publish(t,JSON.stringify(d),{qos:0,retain:!!retain})};
+const cv=$("confetti"),cx=cv.getContext("2d");let parts=[],raf=null;
+function boom(n){if(red)return;cv.width=innerWidth;cv.height=innerHeight;const cols=["#ffc928","#e5384f","#2f6fde","#1f9e57","#f4f1e6"];
+  for(let i=0;i<(n||140);i++)parts.push({x:innerWidth/2,y:innerHeight/3,vx:(Math.random()-.5)*18,vy:Math.random()*-15-4,r:Math.random()*7+4,c:cols[i%5],a:Math.random()*6,l:100+Math.random()*40});
+  if(!raf)tick()}
+function tick(){cx.clearRect(0,0,cv.width,cv.height);parts=parts.filter(p=>p.l-->0);
+  for(const p of parts){p.vy+=.45;p.x+=p.vx;p.y+=p.vy;p.a+=.2;cx.save();cx.translate(p.x,p.y);cx.rotate(p.a);cx.fillStyle=p.c;cx.fillRect(-p.r/2,-p.r/4,p.r,p.r/2);cx.restore()}
+  raf=parts.length?requestAnimationFrame(tick):(cx.clearRect(0,0,cv.width,cv.height),null)}
+let AC=null;addEventListener("pointerdown",()=>{if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}});
+function tone(f,d,t){if(!AC)return;try{const o=AC.createOscillator(),g=AC.createGain();o.type=t||"square";o.frequency.value=f;g.gain.setValueAtTime(.15,AC.currentTime);g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+const fmt=n=>Math.round(n).toLocaleString();
+const QP=new URLSearchParams(location.search);
+const isPlayer=QP.has("play");
+
+/* ---------- HOST ---------- */
+if(!isPlayer){
+  let pin;try{pin=localStorage.getItem("s5pin")}catch(e){}
+  if(!pin){pin=String(100000+Math.random()*900000|0);try{localStorage.setItem("s5pin",pin)}catch(e){}}
+  const T="s5g/"+pin,SITE=location.origin+location.pathname;
+  const P={};           // id -> {name, score, seen}
+  let qi=-1,phase="lobby",cur=null,answers={},t0=0,dur=DUR,timer=null,last=null,mqOK=false,prev={};
+  const live=()=>Object.entries(P).filter(([,p])=>Date.now()-p.seen<30000);
+  const show=s=>["hLobby","hQ","hBoard","hEnd"].forEach(x=>$(x).classList.toggle("hidden",x!==s));
+  function state(extra){const d=Object.assign({v:1,phase,qi,n:Q.length,sc:Object.fromEntries(Object.entries(P).map(([id,p])=>[id,p.score]))},extra||{});last=d;pub(T+"/h",d,true)}
+  function lobby(){const join=SITE+"?play&pin="+pin;
+    $("url").textContent=(SITE+"?play").replace(/^https?:\/\//,"");$("pin").textContent=pin.slice(0,3)+" "+pin.slice(3);
+    if(window.qrcode&&$("qr").dataset.u!==join){try{const q=qrcode(0,"M");q.addData(join);q.make();$("qr").innerHTML=q.createSvgTag({cellSize:6,margin:2,scalable:true});$("qr").dataset.u=join}catch(e){}}
+    const L=live();$("pcount").textContent=L.length?L.length+" player"+(L.length>1?"s":"")+" in":"Waiting for players…";
+    $("names").innerHTML=L.map(([,p])=>`<span class="chip">${esc(p.name)}</span>`).join("")}
+  function conn(ok){mqOK=ok;$("conn").textContent=ok?live().length+" playing":"Connecting…"}
+  $("copy").onclick=async()=>{const t="Join our game, Are You Smarter Than a 5th Grader? Open this on your phone and type your name: "+SITE+"?play&pin="+pin;
+    try{await navigator.clipboard.writeText(t);$("copied").textContent="Copied! Paste it in the group chat."}catch(e){$("copied").textContent=t}};
+
+  function startQ(){
+    qi++;if(qi>=Q.length){end();return}
+    const [g,t,o]=Q[qi],idx=[0,1,2,3].sort(()=>Math.random()-.5);
+    cur={g,t,o:idx.map(i=>o[i]),c:idx.indexOf(0),final:qi===Q.length-1};
+    answers={};dur=cur.final?FINAL_DUR:DUR;t0=Date.now();phase="q";show("hQ");
+    $("qg").textContent=g;$("qn").textContent="Question "+(qi+1)+" of "+Q.length;$("qt").textContent=t;
+    $("qa").innerHTML=cur.o.map((x,i)=>`<div class="ans c${i}">${SH[i]}<span>${esc(x)}</span><span class="cnt"></span></div>`).join("");
+    $("firstbox").innerHTML="";$("next").classList.add("hidden");$("skip").classList.remove("hidden");$("answered").textContent="0 answered";
+    state({g,t,o:cur.o,dur});tone(520,.15);
+    clearInterval(timer);timer=setInterval(tickQ,200);tickQ()}
+  function tickQ(){const left=Math.max(0,dur-(Date.now()-t0)),s=Math.ceil(left/1000);
+    if($("tm").textContent!==String(s)&&s<=5&&s>0)tone(880,.08);
+    $("tm").textContent=s;$("tm").classList.toggle("low",s<=5);$("tbar").style.width=(left/dur*100)+"%";
+    const n=Object.keys(answers).length,L=live().length;$("answered").textContent=n+" of "+L+" answered";
+    if(left<=0||(L>0&&n>=L))reveal()}
+  function reveal(){if(phase!=="q")return;clearInterval(timer);phase="reveal";
+    prev=Object.fromEntries(Object.entries(P).map(([id,p])=>[id,p.score]));
+    const counts=[0,0,0,0],res={},right=[];
+    for(const [id,a] of Object.entries(answers)){counts[a.a]++;if(a.a===cur.c)right.push([id,a.ms])}
+    right.sort((a,b)=>a[1]-b[1]);
+    for(const [id,a] of Object.entries(answers)){const ok=a.a===cur.c;let pts=0;
+      if(ok){pts=Math.round(500+500*Math.max(0,1-a.ms/dur));if(right[0][0]===id)pts+=100;if(cur.final)pts*=2}
+      if(P[id])P[id].score+=pts;res[id]=[ok?1:0,pts]}
+    const f=right[0]?{n:P[right[0][0]]?P[right[0][0]].name:"?",s:(right[0][1]/1000).toFixed(1)}:null;
+    [...$("qa").children].forEach((el,i)=>{el.classList.add(i===cur.c?"right":"dim");el.querySelector(".cnt").textContent=counts[i]});
+    $("firstbox").innerHTML=f?`<div class="first">⚡ First right: ${esc(f.n)} (${f.s}s)</div>`:`<div class="first">Nobody got it! 😅</div>`;
+    $("skip").classList.add("hidden");$("next").classList.remove("hidden");$("next").focus();
+    tone(660,.12,"triangle");setTimeout(()=>tone(990,.25,"triangle"),130);if(f)boom(80);
+    state({g:cur.g,t:cur.t,o:cur.o,c:cur.c,res,first:f})}
+  function rank(){return Object.entries(P).sort((a,b)=>b[1].score-a[1].score)}
+  function board(){phase="board";show("hBoard");const r=rank().slice(0,8);
+    $("btitle").textContent=qi+1>=Q.length-1&&qi<Q.length-1?"Before the FINAL question…":"Leaderboard";
+    $("lb").innerHTML=r.map(([id,p],i)=>{const up=p.score-(prev[id]||0);return `<div class="lrow" style="animation-delay:${i*.08}s"><span class="rk">#${i+1}</span><span>${esc(p.name)}${up?` <small style="color:#1f9e57">+${fmt(up)}</small>`:""}</span><span>${fmt(p.score)}</span></div>`}).join("")||'<p class="center">No players yet.</p>';
+    $("next2").textContent=qi+1>=Q.length?"See the winners ▸":qi+1===Q.length-1?"FINAL question ▸":"Next question ▸";
+    state()}
+  function end(){phase="end";clearInterval(timer);show("hEnd");const r=rank();
+    const p=[r[1],r[0],r[2]];$("pod").innerHTML=p.map((x,i)=>x?`<div class="p${[2,1,3][i]}">${["🥈","🥇","🥉"][i]}<br>${esc(x[1].name)}<br>${fmt(x[1].score)}</div>`:"").join("");
+    $("lbEnd").innerHTML=r.slice(3).map(([,p],i)=>`<div class="lrow"><span class="rk">#${i+4}</span><span>${esc(p.name)}</span><span>${fmt(p.score)}</span></div>`).join("");
+    boom(250);setTimeout(()=>boom(200),900);state()}
+  $("start").onclick=()=>{qi=-1;Object.values(P).forEach(p=>p.score=0);startQ()};
+  $("skip").onclick=reveal;
+  $("next").onclick=board;
+  $("next2").onclick=startQ;
+  $("again").onclick=()=>{qi=-1;Object.values(P).forEach(p=>p.score=0);phase="lobby";show("hLobby");lobby();state()};
+  addEventListener("keydown",e=>{if(e.key!==" "&&e.key!=="Enter")return;if(document.activeElement&&document.activeElement.tagName==="BUTTON")return;e.preventDefault();
+    if(phase==="q")reveal();else if(phase==="reveal")board();else if(phase==="board")startQ()});
+
+  connect(()=>[T+"/p"],(t,d)=>{if(t!==T+"/p")return;const id=clip(d.id,24);if(!id)return;
+    if(d.type==="join"){const name=clip(d.name,20);if(!name)return;const isNew=!P[id];
+      if(isNew)P[id]={name,score:0,seen:Date.now()};else{P[id].name=name;P[id].seen=Date.now()}
+      if(phase==="lobby"){lobby();if(isNew)tone(700,.08,"triangle")}conn(mqOK);if(isNew&&last)pub(T+"/h",last,true)}
+    else if(d.type==="ans"&&phase==="q"&&d.qi===qi&&P[id]&&!answers[id]&&Number.isInteger(d.a)&&d.a>=0&&d.a<4){
+      answers[id]={a:d.a,ms:Date.now()-t0};P[id].seen=Date.now();tickQ()}},
+   ok=>{conn(ok);if(ok)state()});
+  setInterval(()=>{if(phase==="lobby")lobby();conn(mqOK)},3000);
+  lobby();show("hLobby");
+}
+
+/* ---------- PLAYER ---------- */
+else{
+  $("host").classList.add("hidden");$("player").classList.remove("hidden");
+  let pin=(QP.get("pin")||"").replace(/\D/g,"").slice(0,6),name="",hs=null,myQ=-1,mqOK=false,joined=false;
+  let id;try{id=localStorage.getItem("s5id")}catch(e){}if(!id){id=Math.random().toString(36).slice(2,12);try{localStorage.setItem("s5id",id)}catch(e){}}
+  try{const s=JSON.parse(localStorage.getItem("s5me")||"null");if(s&&s.pin===pin&&s.name){name=s.name;joined=true}}catch(e){}
+  $("ppin").value=pin;$("pname").value=name;
+  const tp=()=>"s5g/"+pin;
+  const show=s=>["pJoin","pWait","pQ","pRes"].forEach(x=>$(x).classList.toggle("hidden",x!==s));
+  const beat=()=>{if(joined&&pin&&name)pub(tp()+"/p",{type:"join",id,name})};
+  function myRank(){if(!hs||!hs.sc||typeof hs.sc!=="object")return null;const arr=Object.entries(hs.sc).filter(([,v])=>typeof v==="number").sort((a,b)=>b[1]-a[1]);const i=arr.findIndex(([k])=>k===id);return i<0?null:{r:i+1,n:arr.length,s:hs.sc[id]}}
+  function draw(){
+    if(!joined){show("pJoin");return}
+    $("pwName").textContent=name;
+    if(!mqOK){show("pWait");$("pwMsg").textContent="Connecting…";return}
+    if(!hs){show("pWait");$("pwMsg").textContent="Waiting for the TV… check the PIN.";return}
+    const ph=hs.phase,R=myRank();
+    if(ph==="lobby"){show("pWait");$("pwMsg").textContent="You're in! Watch the TV.";$("pwScore").textContent="";return}
+    if(ph==="q"&&Array.isArray(hs.o)){
+      if(myQ===hs.qi){show("pRes");$("prIcon").textContent="🔒";$("prTitle").textContent="Locked in!";$("prSub").textContent="Waiting for everyone else…";return}
+      show("pQ");$("pqt").textContent=clip(hs.t,200);
+      $("pbtns").innerHTML=hs.o.slice(0,4).map((x,i)=>`<button class="pbtn c${i}" data-a="${i}">${SH[i]}<span>${esc(clip(x,60))}</span></button>`).join("");return}
+    if(ph==="reveal"){show("pRes");const r=hs.res&&hs.res[id];
+      if(!r){$("prIcon").textContent="⏰";$("prTitle").textContent="Too slow!";$("prSub").textContent="The answer was "+clip(hs.o&&hs.o[hs.c],60)}
+      else if(r[0]){$("prIcon").textContent="✅";$("prTitle").textContent="+"+fmt(r[1]);const f=hs.first;$("prSub").textContent=(f&&f.n===name?"⚡ You were FIRST! ":"")+(R?"You're #"+R.r+" of "+R.n:"")}
+      else{$("prIcon").textContent="❌";$("prTitle").textContent="Wrong!";$("prSub").textContent="It was "+clip(hs.o&&hs.o[hs.c],60)+(R?" · You're #"+R.r:"")}
+      return}
+    if(ph==="board"||ph==="end"){show("pWait");$("pwMsg").textContent=ph==="end"?(R&&R.r===1?"🏆 YOU WON! You're smarter than a 5th grader!":"Game over!"):"Look at the leaderboard!";
+      $("pwScore").textContent=R?"#"+R.r+" of "+R.n+" · "+fmt(R.s)+" points":""}}
+  $("pgo").onclick=()=>{pin=$("ppin").value.replace(/\D/g,"").slice(0,6);name=clip($("pname").value,20);
+    if(pin.length!==6){$("perr").textContent="The PIN is the 6 numbers on the TV.";return}
+    if(!name){$("perr").textContent="Type your name.";return}
+    $("perr").textContent="";joined=true;hs=null;try{localStorage.setItem("s5me",JSON.stringify({pin,name}))}catch(e){}
+    if(mq)mq.subscribe(tp()+"/h");beat();draw()};
+  $("pbtns").addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(!b||!hs||hs.phase!=="q"||myQ===hs.qi)return;
+    myQ=hs.qi;pub(tp()+"/p",{type:"ans",id,qi:hs.qi,a:+b.dataset.a});try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}draw()});
+  setInterval(beat,8000);
+  connect(()=>pin?[tp()+"/h"]:[],(t,d)=>{if(t!==tp()+"/h"||d.v!==1)return;const was=hs&&hs.phase;hs=d;draw();
+      if(d.phase==="reveal"&&was!=="reveal"){const r=d.res&&d.res[id];try{navigator.vibrate&&navigator.vibrate(r&&r[0]?[50,40,50]:200)}catch(e){}if(r&&r[0])boom(60)}},
+    ok=>{mqOK=ok;if(ok)beat();draw()});
+  draw();
+}
+}
+</script>
+</body></html>
