@@ -76,6 +76,12 @@ button:focus-visible{outline:3px solid #fff;outline-offset:2px}
 .wheelwrap{position:relative;width:min(70vh,82vw,460px);aspect-ratio:1;margin:6px auto 14px}
 .wheelwrap svg{width:100%;height:100%;display:block;filter:drop-shadow(0 12px 20px rgba(0,0,0,.45));transition:transform 5s cubic-bezier(.12,.7,.08,1)}
 .pointer{position:absolute;left:50%;top:-8px;transform:translateX(-50%);border-left:20px solid transparent;border-right:20px solid transparent;border-top:38px solid var(--bus);z-index:2;filter:drop-shadow(0 3px 0 rgba(0,0,0,.4))}
+.twtitle{font:700 clamp(48px,8vw,96px)/1 Fredoka;color:var(--bus);margin:6px 0;animation:beat 1s infinite}
+.twgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;max-width:1150px;margin:0 auto}
+.twb{min-height:84px;border-radius:16px;color:#fff;font:700 clamp(14px,1.5vw,19px)/1.1 Fredoka;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-shadow:inset 0 -6px 0 rgba(0,0,0,.25);padding:6px}
+.twb span{font-size:26px}
+#twwho button{font-size:22px;min-height:56px}
+@media(max-width:700px){.twgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .twcard{border-radius:22px;padding:22px 26px;text-align:center;color:#fff;border:4px solid var(--bus);animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
 .twn{font:700 clamp(34px,5vw,58px)/1 Fredoka}.twd{font:800 clamp(20px,2.6vw,28px)/1.3 Nunito;margin-top:10px}
 .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
@@ -88,7 +94,7 @@ button:focus-visible{outline:3px solid #fff;outline-offset:2px}
 <!-- HOST -->
 <div class="wrap" id="host">
   <div class="top">
-    <div class="logo">Are You Smarter Than a 5th Grader?<small>Answer on your phone. Fastest right answer scores the most. Watch out for the twist wheel!</small></div>
+    <div class="logo">Are You Smarter Than a 5th Grader?<small>Answer on your phone. Fastest right answer scores the most. Twist time every 5 questions!</small></div>
     <span class="pill" id="conn">Connecting…</span>
   </div>
 
@@ -118,11 +124,13 @@ button:focus-visible{outline:3px solid #fff;outline-offset:2px}
   </section>
 
   <section id="hTwist" class="hidden">
-    <h2 class="center" style="font-size:clamp(36px,5vw,56px);margin:4px 0 6px;color:var(--bus)">🎡 TWIST TIME!</h2>
-    <div class="wheelwrap"><div class="pointer"></div><svg id="wsvg" viewBox="-110 -110 220 220" aria-label="Twist wheel"></svg></div>
-    <div class="center"><button id="spin" style="font-size:26px;min-height:66px;padding:0 50px">SPIN!</button></div>
-    <div id="twres" style="max-width:820px;margin:14px auto"></div>
-    <div class="center"><button id="twgo" class="hidden" style="font-size:22px;min-height:60px">Next question ▸</button></div>
+    <h2 class="center twtitle">🎡 TWIST TIME!</h2>
+    <p class="center" id="twstep" style="font:700 clamp(22px,2.8vw,32px) Fredoka;margin:6px 0 16px"></p>
+    <div class="names" id="twwho"></div>
+    <div class="twgrid hidden" id="twgrid"></div>
+    <div id="twpick"></div>
+    <div class="center" style="margin-top:10px"><button id="twgo" class="hidden" style="font-size:22px;min-height:60px">Next question ▸</button></div>
+    <div id="twlog" style="display:grid;gap:10px;max-width:900px;margin:12px auto"></div>
   </section>
 
   <section id="hEnd" class="hidden">
@@ -223,16 +231,25 @@ const isPlayer=QP.has("play");
 
 /* ---------- TWISTS ---------- */
 const TW=[
- {k:"double",n:"DOUBLE POINTS",d:"The next question is worth double!",c:"#e5384f"},
- {k:"bomb",n:"BOMB",d:"Next question: a WRONG answer costs you 300 points. Not answering is safe.",c:"#2a2a2a"},
- {k:"steal",n:"STEAL",d:"Whoever gets the next question right FIRST steals 300 points from the leader!",c:"#2f6fde"},
- {k:"underdog",n:"UNDERDOG",d:"Last place gets a free 500 points right now!",c:"#1f9e57"},
- {k:"gamble",n:"ALL-IN GAMBLE",d:"Bet some of your points on your phone. Right answer wins the bet, wrong answer loses it!",c:"#e8a10a"},
- {k:"lightning",n:"LIGHTNING",d:"Next question: only 7 seconds… but TRIPLE points!",c:"#7a3bd6"},
- {k:"challenge",n:"CHALLENGE",d:"",c:"#c2410c"}
+ {k:"double",n:"DOUBLE POINTS",d:"Next question is worth DOUBLE!",c:"#e5384f",e:"✖️2"},
+ {k:"bomb",n:"BOMB",d:"Next question: a WRONG answer costs 300. Not answering is safe!",c:"#2a2a2a",e:"💣"},
+ {k:"steal",n:"STEAL",d:"First person to get the next question right steals 300 from the leader!",c:"#2f6fde",e:"🦹"},
+ {k:"underdog",n:"UNDERDOG",d:"",c:"#1f9e57",e:"🐶"},
+ {k:"gamble",n:"ALL-IN",d:"Everyone bets on the next question! Right = win your bet, wrong = lose it.",c:"#e8a10a",e:"🎰"},
+ {k:"lightning",n:"LIGHTNING",d:"Next question: only 7 seconds, but TRIPLE points!",c:"#7a3bd6",e:"⚡"},
+ {k:"challenge",n:"CHALLENGE",d:"",c:"#c2410c",e:"🏃"},
+ {k:"swap",n:"SWAP",d:"",c:"#0e8a8a",e:"🔄",pick:"Who does the spinner swap scores with?"},
+ {k:"robin",n:"ROBIN HOOD",d:"",c:"#3f7d20",e:"🏹"},
+ {k:"jackpot",n:"JACKPOT",d:"",c:"#d4a000",e:"💰"},
+ {k:"bankrupt",n:"BANKRUPT",d:"",c:"#7a1d2c",e:"💸"},
+ {k:"freeze",n:"FREEZE",d:"",c:"#3a8fd6",e:"🧊",pick:"Who gets FROZEN for the next question?"},
+ {k:"everyone",n:"EVERYONE WINS",d:"",c:"#d63b8f",e:"🎉"},
+ {k:"hotseat",n:"HOT SEAT",d:"",c:"#ff6b00",e:"🔥"},
+ {k:"again",n:"SPIN AGAIN",d:"Spin the wheel again! Both twists count. Tap the next one it lands on.",c:"#555",e:"🔁"}
 ];
-const CH=["First person to bring the host a spoon wins 300!","Everyone stand up! Last person standing on one leg wins 300.","Best Egyptian aunt impression wins 300. The room votes!","First person to name 5 Egyptian dishes out loud wins 300.","Hum a song. First person to guess it wins 300.","Rock, paper, scissors tournament! Winner gets 300.","First to say the alphabet backwards from M to A wins 300."];
+const CH=["First person to bring the host a spoon wins!","Everyone stand on one leg! Last one standing wins.","Best Egyptian aunt impression wins. The room votes!","First person to name 5 Egyptian dishes out loud wins.","Hum a song. First person to guess it wins.","Rock, paper, scissors tournament! Last one standing wins.","First to say the alphabet backwards from M to A wins.","Staring contest! Last one to blink wins.","First person to do 10 jumping jacks wins."];
 const TWIST_EVERY=5;
+const HOT=[["Name the 3 colors on Egypt's flag.","Red, white and black"],["What is 13 × 3?","39"],["Spell “Mississippi”.","M-I-S-S-I-S-S-I-P-P-I"],["What is the capital of Japan?","Tokyo"],["How many days are in a leap year?","366"],["Name 3 planets.","Any 3: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune"],["What is half of 250?","125"],["Name 5 countries in Africa.","Any 5, e.g. Egypt, Nigeria, Kenya, Morocco, Ghana"],["What is “dog” in Arabic?","Kalb (كلب)"],["How many sides does a pentagon have?","5"]];
 
 /* ---------- HOST ---------- */
 if(!isPlayer){
@@ -240,7 +257,7 @@ if(!isPlayer){
   if(!pin){pin=String(100000+Math.random()*900000|0);try{localStorage.setItem("s5pin",pin)}catch(e){}}
   const T="s5g/"+pin,SITE=location.origin+location.pathname;
   const P={};
-  let qi=-1,phase="lobby",cur=null,answers={},t0=0,dur=DUR,timer=null,last=null,mqOK=false,prev={},tw=null,bets={},spun=false,rot=0;
+  let qi=-1,phase="lobby",cur=null,answers={},t0=0,dur=DUR,timer=null,last=null,mqOK=false,prev={},bets={},TF={},spinner=null,used={},twMsg="";
   const live=()=>Object.entries(P).filter(([,p])=>Date.now()-p.seen<30000);
   const show=s=>["hLobby","hQ","hBoard","hTwist","hEnd"].forEach(x=>$(x).classList.toggle("hidden",x!==s));
   function state(extra){const d=Object.assign({v:2,phase,qi,n:Q.length,sc:Object.fromEntries(Object.entries(P).map(([id,p])=>[id,p.score]))},extra||{});last=d;pub(T+"/h",d,true)}
@@ -258,44 +275,47 @@ if(!isPlayer){
     qi++;if(qi>=Q.length){end();return}
     const [g,t,o]=Q[qi],idx=[0,1,2,3].sort(()=>Math.random()-.5);
     const c=idx.indexOf(0),wrong=[0,1,2,3].filter(i=>i!==c).sort(()=>Math.random()-.5).slice(0,2);
-    cur={g,t,o:idx.map(i=>o[i]),c,x:wrong,final:qi===Q.length-1,tw:tw&&tw.k!=="underdog"&&tw.k!=="challenge"?tw.k:null,leader:rank()[0]&&rank()[0][0]};
-    answers={};dur=cur.tw==="lightning"?7000:cur.final?FINAL_DUR:DUR;t0=Date.now();phase="q";show("hQ");
-    const tag=cur.tw?" · 🎡 "+TW.find(x=>x.k===cur.tw).n:"";
+    const F=Object.assign({},TF);TF={};
+    cur={g,t,o:idx.map(i=>o[i]),c,x:wrong,final:qi===Q.length-1,F,leader:rank()[0]&&rank()[0][0]};
+    answers={};dur=F.lightning?7000:cur.final?FINAL_DUR:DUR;t0=Date.now();phase="q";show("hQ");
+    const tags=["double","bomb","steal","gamble","lightning"].filter(k=>F[k]).map(k=>TW.find(x=>x.k===k).e+" "+TW.find(x=>x.k===k).n);
+    if(F.frozen&&P[F.frozen])tags.push("🧊 "+P[F.frozen].name+" frozen");
+    const tag=tags.length?" · "+tags.join(" · "):"";
     $("qg").textContent=g+tag;$("qn").textContent="Question "+(qi+1)+" of "+Q.length;$("qt").textContent=t;
     $("qa").innerHTML=cur.o.map((x,i)=>`<div class="ans c${i}">${SH[i]}<span>${esc(x)}</span><span class="cnt"></span></div>`).join("");
     $("firstbox").innerHTML="";$("next").classList.add("hidden");$("skip").classList.remove("hidden");$("answered").textContent="0 answered";
-    state({g:g+tag,t,o:cur.o,x:cur.x,dur,tw:cur.tw});tone(520,.15);
+    state({g:g+tag,t,o:cur.o,x:cur.x,dur,F:{bomb:!!F.bomb,lightning:!!F.lightning,double:!!F.double,steal:!!F.steal,gamble:!!F.gamble,frozen:F.frozen||null}});tone(520,.15);
     clearInterval(timer);timer=setInterval(tickQ,200);tickQ()}
   function tickQ(){const left=Math.max(0,dur-(Date.now()-t0)),s=Math.ceil(left/1000);
     if($("tm").textContent!==String(s)&&s<=5&&s>0)tone(880,.08);
     $("tm").textContent=s;$("tm").classList.toggle("low",s<=5);$("tbar").style.width=(left/dur*100)+"%";
-    const n=Object.keys(answers).length,L=live().length;$("answered").textContent=n+" of "+L+" answered";
+    const n=Object.keys(answers).length,L=live().filter(([id])=>id!==(cur&&cur.F.frozen)).length;$("answered").textContent=n+" of "+L+" answered";
     if(left<=0||(L>0&&n>=L))reveal()}
   function reveal(){if(phase!=="q")return;clearInterval(timer);phase="reveal";
     prev=Object.fromEntries(Object.entries(P).map(([id,p])=>[id,p.score]));
     const counts=[0,0,0,0],res={},right=[];
     for(const [id,a] of Object.entries(answers)){counts[a.a]++;if(a.a===cur.c)right.push([id,a.ms])}
     right.sort((a,b)=>a[1]-b[1]);
-    const mult=(cur.final?2:1)*(cur.tw==="double"?2:1)*(cur.tw==="lightning"?3:1);
-    const ids=new Set([...Object.keys(answers),...(cur.tw==="gamble"?Object.keys(bets):[])]);
+    const F=cur.F,mult=(cur.final?2:1)*(F.double?2:1)*(F.lightning?3:1);
+    const ids=new Set([...Object.keys(answers),...(F.gamble?Object.keys(bets):[])]);
     let extra="";
     for(const id of ids){if(!P[id])continue;const a=answers[id],ok=!!a&&a.a===cur.c;let pts=0,note="";
       if(ok){pts=Math.round(500+500*Math.max(0,1-a.ms/dur));if(right[0][0]===id)pts+=100;pts*=mult;if(a.ff){pts=Math.round(pts/2);note="50/50 used: half points. "}}
-      else if(a&&cur.tw==="bomb"){pts=-300;note="💣 BOOM! "}
-      if(cur.tw==="gamble"&&bets[id]){const b=bets[id];if(ok){pts+=b;note+="Won your bet: +"+fmt(b)+". "}else{pts-=b;note+="Lost your bet: −"+fmt(b)+". "}}
+      else if(a&&F.bomb){pts=-300;note="💣 BOOM! "}
+      if(F.gamble&&bets[id]){const b=bets[id];if(ok){pts+=b;note+="Won your bet: +"+fmt(b)+". "}else{pts-=b;note+="Lost your bet: −"+fmt(b)+". "}}
       P[id].score=Math.max(0,P[id].score+pts);res[id]=[ok?1:0,pts,note.trim()]}
-    if(cur.tw==="steal"&&right[0]){const thief=right[0][0],L=cur.leader;
+    if(F.steal&&right[0]){const thief=right[0][0],L=cur.leader;
       if(L&&L!==thief&&P[L]&&P[thief]){const amt=Math.min(300,P[L].score);P[L].score-=amt;P[thief].score+=amt;
         res[thief][1]+=amt;res[thief][2]=(res[thief][2]+" 🦹 Stole "+amt+" from "+P[L].name+"!").trim();
         res[L]=res[L]||[0,0,""];res[L][1]-=amt;res[L][2]=(res[L][2]+" "+P[thief].name+" stole "+amt+" from you!").trim();
         extra=` · 🦹 ${esc(P[thief].name)} stole ${amt} from ${esc(P[L].name)}!`}}
     const f=right[0]?{n:P[right[0][0]]?P[right[0][0]].name:"?",s:(right[0][1]/1000).toFixed(1)}:null;
-    let bombs=0;if(cur.tw==="bomb")for(const a of Object.values(answers))if(a.a!==cur.c)bombs++;
+    let bombs=0;if(F.bomb)for(const a of Object.values(answers))if(a.a!==cur.c)bombs++;
     [...$("qa").children].forEach((el,i)=>{el.classList.add(i===cur.c?"right":"dim");el.querySelector(".cnt").textContent=counts[i]});
     $("firstbox").innerHTML=(f?`<div class="first">⚡ First right: ${esc(f.n)} (${f.s}s)${extra}</div>`:`<div class="first">Nobody got it! 😅</div>`)+(bombs?`<div class="first" style="margin-top:8px">💣 ${bombs} got blown up!</div>`:"");
     $("skip").classList.add("hidden");$("next").classList.remove("hidden");$("next").focus();
     tone(660,.12,"triangle");setTimeout(()=>tone(990,.25,"triangle"),130);if(f)boom(80);
-    tw=null;bets={};
+    bets={};
     state({g:cur.g,t:cur.t,o:cur.o,c:cur.c,res,first:f})}
   function board(){phase="board";show("hBoard");const r=rank().slice(0,8);
     const twistNext=(qi+1)%TWIST_EVERY===0&&qi+1<Q.length-1;
@@ -304,35 +324,52 @@ if(!isPlayer){
     $("next2").textContent=qi+1>=Q.length?"See the winners ▸":twistNext?"🎡 TWIST TIME ▸":qi+1===Q.length-1?"FINAL question ▸":"Next question ▸";
     $("next2").dataset.tw=twistNext?"1":"";
     state()}
-  /* twist wheel */
-  (function(){const N=TW.length,A=360/N,rad=d=>(d-90)*Math.PI/180;let g="";
-    TW.forEach((w,i)=>{const a0=rad(i*A),a1=rad((i+1)*A);
-      g+=`<path d="M0 0L${(100*Math.cos(a0)).toFixed(2)} ${(100*Math.sin(a0)).toFixed(2)}A100 100 0 0 1 ${(100*Math.cos(a1)).toFixed(2)} ${(100*Math.sin(a1)).toFixed(2)}Z" fill="${w.c}" stroke="#f4f1e6" stroke-width="1.5"/><text transform="rotate(${i*A+A/2-90}) translate(60 0)" text-anchor="middle" dominant-baseline="middle" font-family="Fredoka,Nunito,sans-serif" font-weight="700" font-size="9.5" fill="#fff">${w.n}</text>`});
-    $("wsvg").innerHTML=g+'<circle r="100" fill="none" stroke="#ffc928" stroke-width="5"/><circle r="15" fill="#ffc928" stroke="#1f3a2c" stroke-width="4"/>'})();
-  function twistScreen(){phase="twist";show("hTwist");spun=false;$("spin").disabled=false;$("spin").classList.remove("hidden");$("twres").innerHTML='<p class="center" style="color:var(--mut);font-weight:900">Spin the wheel to see what happens next!</p>';$("twgo").classList.add("hidden");state({tw:null})}
-  $("spin").onclick=()=>{if(spun)return;spun=true;$("spin").disabled=true;
-    rot+=1800+Math.random()*360;$("wsvg").style.transform=`rotate(${rot}deg)`;
-    let tk=0;const ti=setInterval(()=>{tone(300+((tk++)%2)*80,.03)},120);
-    setTimeout(()=>{clearInterval(ti);const A=360/TW.length,i=Math.floor(((360-rot%360)%360)/A)%TW.length;applyTwist(TW[i])},red?50:5000)};
-  function applyTwist(w){tw=w;boom(120);tone(523,.15,"triangle");setTimeout(()=>tone(784,.3,"triangle"),150);
-    let desc=w.d,btns="";
-    if(w.k==="underdog"){const r=rank();if(r.length){const [id,p]=r[r.length-1];p.score+=500;desc=`${esc(p.name)} was in last place and gets +500!`}else desc="No players yet!"}
-    if(w.k==="challenge"){desc=esc(CH[Math.random()*CH.length|0]);btns=`<div class="row" id="chw" style="margin-top:12px">${rank().map(([id,p])=>`<button class="ghost" data-cw="${esc(id)}">${esc(p.name)} won</button>`).join("")}</div>`}
-    $("twres").innerHTML=`<div class="twcard" style="background:${w.c}"><div class="twn">🎡 ${w.n}</div><div class="twd">${w.k==="underdog"||w.k==="challenge"?desc:esc(desc)}</div>${btns}</div>`;
-    $("spin").classList.add("hidden");$("twgo").classList.remove("hidden");
-    if(w.k==="gamble"){phase="wager";bets={};$("twgo").textContent="Lock bets & start question ▸";state({tw:"gamble",twn:w.n,twd:w.d})}
-    else{$("twgo").textContent="Next question ▸";state({tw:w.k,twn:w.n,twd:w.k==="underdog"||w.k==="challenge"?$("twres").querySelector(".twd").textContent:w.d})}}
-  $("twres").addEventListener("click",e=>{const b=e.target.closest("[data-cw]");if(!b)return;const p=P[b.dataset.cw];if(p){p.score+=300;boom(60);$("chw").innerHTML=`<span class="pill">+300 to ${esc(p.name)}!</span>`;state({tw:"challenge",twn:"CHALLENGE",twd:p.name+" won the challenge! +300"})}});
-  $("twgo").onclick=startQ;
+  /* twist break (physical wheel at home) */
+  function twistScreen(){phase="twist";show("hTwist");spinner=null;used={};twMsg="";TF={};
+    $("twstep").textContent="Pick someone to spin the wheel! Who's spinning?";
+    $("twwho").innerHTML=rank().map(([id,p])=>`<button class="ghost" data-sp="${esc(id)}">${esc(p.name)}</button>`).join("")||'<span class="pill">No players</span>';
+    $("twwho").classList.remove("hidden");$("twgrid").classList.add("hidden");$("twpick").innerHTML="";$("twlog").innerHTML="";$("twgo").classList.add("hidden");
+    boom(120);tone(523,.15,"triangle");setTimeout(()=>tone(784,.3,"triangle"),150);
+    state({twn:"TWIST TIME!",twd:"Someone is about to spin the wheel…"})}
+  $("twwho").addEventListener("click",e=>{const b=e.target.closest("[data-sp]");if(!b||!P[b.dataset.sp])return;spinner=b.dataset.sp;
+    $("twwho").classList.add("hidden");$("twstep").textContent="🎡 "+P[spinner].name+" is spinning! Tap where the wheel lands:";
+    $("twgrid").innerHTML=TW.map(w=>`<button class="twb" data-tw="${w.k}" style="background:${w.c}"><span>${w.e}</span>${w.n}</button>`).join("");
+    $("twgrid").classList.remove("hidden");$("twgo").classList.remove("hidden");
+    state({twn:"🎡 "+P[spinner].name+" is spinning!",twd:"Watch the wheel…"})});
+  function log(w,msg){twMsg=msg;$("twlog").insertAdjacentHTML("afterbegin",`<div class="twcard" style="background:${w.c}"><div class="twn">${w.e} ${w.n}</div><div class="twd">${esc(msg)}</div></div>`);
+    boom(100);tone(660,.12,"triangle");setTimeout(()=>tone(990,.25,"triangle"),130);state({twn:w.e+" "+w.n,twd:msg})}
+  function picker(title,ids,cb){$("twpick").innerHTML=`<div class="center" style="margin:10px 0"><div style="font-weight:900;margin-bottom:8px">${esc(title)}</div><div class="row">${ids.map(([id,p])=>`<button class="ghost" data-pk="${esc(id)}">${esc(p.name)}</button>`).join("")}</div></div>`;
+    $("twpick").onclick=e=>{const b=e.target.closest("[data-pk]");if(!b||!P[b.dataset.pk])return;$("twpick").innerHTML="";cb(b.dataset.pk)}}
+  const S_=()=>P[spinner];
+  function applyTwist(k){const w=TW.find(x=>x.k===k),sp=S_();if(!w||!sp)return;used[k]=(used[k]||0)+1;
+    const others=rank().filter(([id])=>id!==spinner);
+    if(["double","bomb","steal","lightning"].includes(k)){TF[k]=true;log(w,w.d);return}
+    if(k==="gamble"){TF.gamble=true;log(w,w.d);return}
+    if(k==="again"){log(w,w.d);return}
+    if(k==="underdog"){const r=rank(),L=r[r.length-1];if(L){L[1].score+=500;log(w,L[1].name+" was in last place and gets +500!")}return}
+    if(k==="jackpot"){sp.score+=500;log(w,sp.name+" hit the JACKPOT! +500");return}
+    if(k==="bankrupt"){const lost=Math.ceil(sp.score/2);sp.score-=lost;log(w,sp.name+" went BANKRUPT and lost "+fmt(lost)+" points!");return}
+    if(k==="everyone"){Object.values(P).forEach(p=>p.score+=200);log(w,"Everyone gets +200!");return}
+    if(k==="robin"){const r=rank();if(r.length<2){log(w,"Need at least 2 players!");return}const [,top]=r[0],[,bot]=r[r.length-1];const amt=Math.min(200,top.score);top.score-=amt;bot.score+=amt;log(w,top.name+" gives "+amt+" to "+bot.name+"!");return}
+    if(k==="swap"){if(!others.length){log(w,"Nobody to swap with!");return}picker(w.pick,others,id=>{const t=P[id],s=sp.score;sp.score=t.score;t.score=s;log(w,sp.name+" swapped scores with "+t.name+"! "+sp.name+": "+fmt(sp.score)+" · "+t.name+": "+fmt(t.score))});return}
+    if(k==="freeze"){if(!others.length){log(w,"Nobody to freeze!");return}picker(w.pick,others,id=>{TF.frozen=id;log(w,P[id].name+" is FROZEN and can't answer the next question!")});return}
+    if(k==="challenge"){const c=CH[Math.random()*CH.length|0];log(w,c+" Winner gets 300.");picker("Who won the challenge?",rank(),id=>{P[id].score+=300;log(w,P[id].name+" won the challenge! +300")});return}
+    if(k==="hotseat"){const q=HOT[Math.random()*HOT.length|0];log(w,sp.name+", 10 seconds, answer out loud: "+q[0]);
+      $("twpick").innerHTML=`<div class="center" style="margin:10px 0"><div class="big" style="font-size:clamp(26px,3.6vw,44px);margin:8px 0">${esc(q[0])}</div><div style="color:var(--mut);font-weight:900;margin-bottom:10px">Answer (host only): ${esc(q[1])}</div><div class="row"><button id="hsR" style="background:#36d07a;color:#06331a;box-shadow:none">✓ Right (+500)</button><button id="hsW" style="background:#ff4b4b;color:#fff;box-shadow:none">✗ Wrong (−200)</button></div></div>`;
+      $("twpick").onclick=e=>{if(e.target.id==="hsR"){sp.score+=500;$("twpick").innerHTML="";log(w,sp.name+" got it right! +500")}else if(e.target.id==="hsW"){sp.score=Math.max(0,sp.score-200);$("twpick").innerHTML="";log(w,sp.name+" got it wrong! −200")}};return}}
+  $("twgrid").addEventListener("click",e=>{const b=e.target.closest("[data-tw]");if(b)applyTwist(b.dataset.tw)});
+  $("twgo").onclick=()=>{$("twpick").innerHTML="";if(TF.gamble){phase="wager";bets={};show("hTwist");$("twgrid").classList.add("hidden");$("twstep").textContent="🎰 ALL-IN! Everyone place your bets on your phone.";$("twgo").textContent="Lock bets & start question ▸";$("twgo").onclick=()=>{$("twgo").onclick=null;startQ();resetTwGo()};state({tw:"gamble",twn:"🎰 ALL-IN",twd:"Place your bet!"})}else startQ()};
+  function resetTwGo(){$("twgo").textContent="Next question ▸";$("twgo").onclick=()=>{$("twpick").innerHTML="";if(TF.gamble){phase="wager";bets={};$("twgrid").classList.add("hidden");$("twstep").textContent="🎰 ALL-IN! Everyone place your bets on your phone.";$("twgo").textContent="Lock bets & start question ▸";$("twgo").onclick=()=>{startQ();resetTwGo()};state({tw:"gamble",twn:"🎰 ALL-IN",twd:"Place your bet!"})}else startQ()}}
+  resetTwGo();
   function end(){phase="end";clearInterval(timer);show("hEnd");const r=rank();
     const p=[r[1],r[0],r[2]];$("pod").innerHTML=p.map((x,i)=>x?`<div class="p${[2,1,3][i]}">${["🥈","🥇","🥉"][i]}<br>${esc(x[1].name)}<br>${fmt(x[1].score)}</div>`:"").join("");
     $("lbEnd").innerHTML=r.slice(3).map(([,p],i)=>`<div class="lrow"><span class="rk">#${i+4}</span><span>${esc(p.name)}</span><span>${fmt(p.score)}</span></div>`).join("");
     boom(250);setTimeout(()=>boom(200),900);state()}
-  $("start").onclick=()=>{qi=-1;tw=null;Object.values(P).forEach(p=>{p.score=0;p.ff=false});startQ()};
+  $("start").onclick=()=>{qi=-1;TF={};Object.values(P).forEach(p=>{p.score=0;p.ff=false});startQ()};
   $("skip").onclick=reveal;
   $("next").onclick=board;
   $("next2").onclick=()=>{if($("next2").dataset.tw)twistScreen();else startQ()};
-  $("again").onclick=()=>{qi=-1;tw=null;Object.values(P).forEach(p=>{p.score=0;p.ff=false});phase="lobby";show("hLobby");lobby();state()};
+  $("again").onclick=()=>{qi=-1;TF={};Object.values(P).forEach(p=>{p.score=0;p.ff=false});phase="lobby";show("hLobby");lobby();state()};
   addEventListener("keydown",e=>{if(e.key!==" "&&e.key!=="Enter")return;if(document.activeElement&&document.activeElement.tagName==="BUTTON")return;e.preventDefault();
     if(phase==="q")reveal();else if(phase==="reveal")board();else if(phase==="board")$("next2").click()});
 
@@ -340,7 +377,7 @@ if(!isPlayer){
     if(d.type==="join"){const name=clip(d.name,20);if(!name)return;const isNew=!P[id];
       if(isNew)P[id]={name,score:0,seen:Date.now(),ff:false};else{P[id].name=name;P[id].seen=Date.now()}
       if(phase==="lobby"){lobby();if(isNew)tone(700,.08,"triangle")}conn(mqOK);if(isNew&&last)pub(T+"/h",last,true)}
-    else if(d.type==="ans"&&phase==="q"&&d.qi===qi&&P[id]&&!answers[id]&&Number.isInteger(d.a)&&d.a>=0&&d.a<4){
+    else if(d.type==="ans"&&phase==="q"&&d.qi===qi&&P[id]&&!answers[id]&&id!==cur.F.frozen&&Number.isInteger(d.a)&&d.a>=0&&d.a<4){
       let ff=false;if(d.ff&&!P[id].ff){P[id].ff=true;ff=true}
       answers[id]={a:d.a,ms:Date.now()-t0,ff};P[id].seen=Date.now();tickQ()}
     else if(d.type==="bet"&&phase==="wager"&&P[id]&&[0,25,50,100].includes(d.pct)){bets[id]=Math.floor(P[id].score*d.pct/100);
@@ -368,17 +405,19 @@ else{
     if(!hs){show("pWait");$("pwMsg").textContent="Waiting for the TV… check the PIN.";return}
     const ph=hs.phase,R=myRank();
     if(ph==="lobby"){show("pWait");$("pwMsg").textContent="You're in! Watch the TV.";$("pwScore").textContent="";return}
-    if(ph==="twist"){show("pWait");$("pwMsg").textContent=hs.twn?"🎡 "+clip(hs.twn,30)+": "+clip(hs.twd,160):"🎡 TWIST WHEEL! Watch the TV…";$("pwScore").textContent=R?fmt(R.s)+" points":"";return}
+    if(ph==="twist"){show("pWait");$("pwMsg").textContent=hs.twn?clip(hs.twn,40)+" "+clip(hs.twd,200):"🎡 TWIST TIME! Watch the TV…";$("pwScore").textContent=R?fmt(R.s)+" points":"";return}
     if(ph==="wager"){if(betQ===hs.qi){show("pWait");$("pwMsg").textContent="🎰 Bet locked: "+fmt(myBet)+" points. Good luck!";$("pwScore").textContent="";return}
       show("pBet");const s=R?R.s:0;$("pbs").textContent="You have "+fmt(s)+" points. How much do you bet?";
       $("pbb").innerHTML=[0,25,50,100].map(p=>`<button class="pbtn c${[3,1,2,0][[0,25,50,100].indexOf(p)]}" data-p="${p}" style="min-height:90px"><span>${p===100?"ALL IN":p+"%"}</span><small>${fmt(Math.floor(s*p/100))}</small></button>`).join("");return}
     if(ph==="q"&&Array.isArray(hs.o)){
+      const FF=hs.F&&typeof hs.F==="object"?hs.F:{};
+      if(FF.frozen===id){show("pRes");$("prIcon").textContent="🧊";$("prTitle").textContent="You're FROZEN!";$("prSub").textContent="Sit this one out…";return}
       if(myQ===hs.qi){show("pRes");$("prIcon").textContent="🔒";$("prTitle").textContent="Locked in!";$("prSub").textContent="Waiting for everyone else…";return}
       show("pQ");$("pqt").textContent=clip(hs.t,200);
       const hide=ffOn===hs.qi&&Array.isArray(hs.x)?hs.x:[];
       $("pbtns").innerHTML=hs.o.slice(0,4).map((x,i)=>hide.includes(i)?`<div class="pbtn c${i}" style="opacity:.15"></div>`:`<button class="pbtn c${i}" data-a="${i}">${SH[i]}<span>${esc(clip(x,60))}</span></button>`).join("");
       $("pff").classList.toggle("hidden",ffUsed);
-      $("ptw").textContent=hs.tw==="bomb"?"💣 BOMB: wrong answer = −300":hs.tw==="lightning"?"⚡ LIGHTNING: 7 seconds, triple points!":hs.tw==="double"?"✖️2 DOUBLE POINTS":hs.tw==="steal"?"🦹 STEAL: first right steals from the leader":hs.tw==="gamble"?"🎰 Your bet is riding on this!":"";
+      $("ptw").textContent=[FF.bomb&&"💣 BOMB: wrong = −300",FF.lightning&&"⚡ 7 sec, triple points",FF.double&&"✖️2 DOUBLE",FF.steal&&"🦹 STEAL is on",FF.gamble&&"🎰 Your bet is riding on this!"].filter(Boolean).join(" · ");
       return}
     if(ph==="reveal"){show("pRes");const r=hs.res&&hs.res[id],note=r&&typeof r[2]==="string"?clip(r[2],120):"";
       if(!r){$("prIcon").textContent="⏰";$("prTitle").textContent="Too slow!";$("prSub").textContent="The answer was "+clip(hs.o&&hs.o[hs.c],60)}
