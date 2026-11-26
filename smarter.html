@@ -80,7 +80,8 @@ button:focus-visible{outline:3px solid #fff;outline-offset:2px}
 .twgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;max-width:1150px;margin:0 auto}
 .twb{min-height:84px;border-radius:16px;color:#fff;font:700 clamp(14px,1.5vw,19px)/1.1 Fredoka;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-shadow:inset 0 -6px 0 rgba(0,0,0,.25);padding:6px}
 .twb span{font-size:26px}
-#twwho button{font-size:22px;min-height:56px}
+#twwho button{font-size:22px;min-height:56px;transition:transform .08s}
+#twwho .hl{background:var(--bus);color:#2a2100;border-color:var(--bus);transform:scale(1.15)}
 @media(max-width:700px){.twgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .twcard{border-radius:22px;padding:22px 26px;text-align:center;color:#fff;border:4px solid var(--bus);animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
 .twn{font:700 clamp(34px,5vw,58px)/1 Fredoka}.twd{font:800 clamp(20px,2.6vw,28px)/1.3 Nunito;margin-top:10px}
@@ -327,15 +328,23 @@ if(!isPlayer){
   /* twist break (physical wheel at home) */
   function twistScreen(){phase="twist";show("hTwist");spinner=null;used={};twMsg="";TF={};
     $("twstep").textContent="Pick someone to spin the wheel! Who's spinning?";
-    $("twwho").innerHTML=rank().map(([id,p])=>`<button class="ghost" data-sp="${esc(id)}">${esc(p.name)}</button>`).join("")||'<span class="pill">No players</span>';
+    $("twwho").innerHTML=(rank().map(([id,p])=>`<button class="ghost" data-sp="${esc(id)}">${esc(p.name)}</button>`).join("")||'<span class="pill">No players</span>')+(rank().length>1?'<div style="flex-basis:100%;text-align:center;margin-top:8px"><button id="rndsp" style="font-size:24px;min-height:62px;padding:0 34px">🎲 Random spinner</button></div>':"");
     $("twwho").classList.remove("hidden");$("twgrid").classList.add("hidden");$("twpick").innerHTML="";$("twlog").innerHTML="";$("twgo").classList.add("hidden");
     boom(120);tone(523,.15,"triangle");setTimeout(()=>tone(784,.3,"triangle"),150);
     state({twn:"TWIST TIME!",twd:"Someone is about to spin the wheel…"})}
-  $("twwho").addEventListener("click",e=>{const b=e.target.closest("[data-sp]");if(!b||!P[b.dataset.sp])return;spinner=b.dataset.sp;
+  let rolling=false;
+  function randomSpinner(){if(rolling)return;const bs=[...$("twwho").querySelectorAll("[data-sp]")];if(bs.length<2)return;rolling=true;$("rndsp").disabled=true;
+    const pick=Math.random()*bs.length|0,total=bs.length*3+pick;let i=0,delay=60;
+    state({twn:"🎲 Picking a random spinner…",twd:"Drumroll…"});
+    (function step(){bs.forEach(b=>b.classList.remove("hl"));const b=bs[i%bs.length];b.classList.add("hl");tone(400+(i%2)*120,.05);
+      if(i>=total){setTimeout(()=>{rolling=false;boom(80);tone(784,.3,"triangle");b.classList.remove("hl");chooseSpinner(b.dataset.sp)},700);return}
+      i++;delay=60+Math.pow(i/total,3)*420;setTimeout(step,red?1:delay)})()}
+  $("twwho").addEventListener("click",e=>{if(e.target.id==="rndsp"){randomSpinner();return}if(rolling)return;const b=e.target.closest("[data-sp]");if(!b||!P[b.dataset.sp])return;chooseSpinner(b.dataset.sp)});
+  function chooseSpinner(sid){if(!P[sid])return;spinner=sid;
     $("twwho").classList.add("hidden");$("twstep").textContent="🎡 "+P[spinner].name+" is spinning! Tap where the wheel lands:";
     $("twgrid").innerHTML=TW.map(w=>`<button class="twb" data-tw="${w.k}" style="background:${w.c}"><span>${w.e}</span>${w.n}</button>`).join("");
     $("twgrid").classList.remove("hidden");$("twgo").classList.remove("hidden");
-    state({twn:"🎡 "+P[spinner].name+" is spinning!",twd:"Watch the wheel…"})});
+    state({twn:"🎡 "+P[spinner].name+" is spinning!",twd:"Watch the wheel…"})}
   function log(w,msg){twMsg=msg;$("twlog").insertAdjacentHTML("afterbegin",`<div class="twcard" style="background:${w.c}"><div class="twn">${w.e} ${w.n}</div><div class="twd">${esc(msg)}</div></div>`);
     boom(100);tone(660,.12,"triangle");setTimeout(()=>tone(990,.25,"triangle"),130);state({twn:w.e+" "+w.n,twd:msg})}
   function picker(title,ids,cb){$("twpick").innerHTML=`<div class="center" style="margin:10px 0"><div style="font-weight:900;margin-bottom:8px">${esc(title)}</div><div class="row">${ids.map(([id,p])=>`<button class="ghost" data-pk="${esc(id)}">${esc(p.name)}</button>`).join("")}</div></div>`;
